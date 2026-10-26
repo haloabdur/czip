@@ -34,7 +34,15 @@ pub(crate) fn write(
         progress.check()?;
         progress.set_current(&item.name);
         let mut opts = SimpleFileOptions::default()
-            .unix_permissions(if item.mode == 0 { if item.is_dir { 0o755 } else { 0o644 } } else { item.mode })
+            .unix_permissions(if item.mode == 0 {
+                if item.is_dir {
+                    0o755
+                } else {
+                    0o644
+                }
+            } else {
+                item.mode
+            })
             .large_file(item.size >= u32::MAX as u64 / 2);
         if let Some(t) = item.mtime.and_then(to_zip_time) {
             opts = opts.last_modified_time(t);
@@ -46,12 +54,16 @@ pub(crate) fn write(
         opts = if STORED_EXT.contains(&ext_of(&item.name).as_str()) {
             opts.compression_method(CompressionMethod::Stored)
         } else {
-            opts.compression_method(CompressionMethod::Deflated).compression_level(Some(deflate))
+            opts.compression_method(CompressionMethod::Deflated)
+                .compression_level(Some(deflate))
         };
         let file = File::open(&item.path).map_err(Error::at(&item.path))?;
         let mut r = Counting::new(BufReader::with_capacity(1 << 20, file), progress);
         match password {
-            Some(pw) => zip.start_file(item.name.as_str(), opts.with_aes_encryption(AesMode::Aes256, pw))?,
+            Some(pw) => zip.start_file(
+                item.name.as_str(),
+                opts.with_aes_encryption(AesMode::Aes256, pw),
+            )?,
             None => zip.start_file(item.name.as_str(), opts)?,
         }
         io::copy(&mut r, &mut zip).map_err(Error::at(&item.path))?;
@@ -85,7 +97,14 @@ pub(crate) fn info(path: &Path) -> Result<ArchiveInfo> {
             is_dir: f.is_dir(),
             size: f.size(),
             mtime: f.last_modified().and_then(|t| {
-                from_civil(i64::from(t.year()), t.month(), t.day(), t.hour(), t.minute(), t.second())
+                from_civil(
+                    i64::from(t.year()),
+                    t.month(),
+                    t.day(),
+                    t.hour(),
+                    t.minute(),
+                    t.second(),
+                )
             }),
         });
     }
@@ -105,7 +124,12 @@ pub(crate) fn extract(
     progress: &Progress,
 ) -> Result<(u64, u64, u64)> {
     let info = info(path)?;
-    let total = info.entries.iter().filter(|e| selected(only, &e.path)).map(|e| e.size).sum();
+    let total = info
+        .entries
+        .iter()
+        .filter(|e| selected(only, &e.path))
+        .map(|e| e.size)
+        .sum();
     progress.start(total);
     let mut z = open(path)?;
     let (mut files, mut dirs, mut bytes) = (0, 0, 0);
@@ -113,7 +137,9 @@ pub(crate) fn extract(
         progress.check()?;
         let encrypted = z.by_index_raw(i)?.encrypted();
         let mut f = if encrypted {
-            let pw = password.filter(|p| !p.is_empty()).ok_or(Error::PasswordRequired)?;
+            let pw = password
+                .filter(|p| !p.is_empty())
+                .ok_or(Error::PasswordRequired)?;
             z.by_index_decrypt(i, pw.as_bytes())?
         } else {
             z.by_index(i)?
@@ -124,7 +150,14 @@ pub(crate) fn extract(
         }
         let out = safe_join(dest, &name)?;
         let mtime = f.last_modified().and_then(|t| {
-            from_civil(i64::from(t.year()), t.month(), t.day(), t.hour(), t.minute(), t.second())
+            from_civil(
+                i64::from(t.year()),
+                t.month(),
+                t.day(),
+                t.hour(),
+                t.minute(),
+                t.second(),
+            )
         });
         let mode = f.unix_mode().unwrap_or(0) & 0o7777;
         if f.is_dir() {
@@ -136,7 +169,10 @@ pub(crate) fn extract(
         let mut w = BufWriter::with_capacity(1 << 20, create_file(&out)?);
         let n = copy_counting(&mut f, &mut w, progress).map_err(|e| match e.kind() {
             io::ErrorKind::InvalidData if encrypted => Error::WrongPassword,
-            _ => Error::IoPath { path: out.clone(), source: e },
+            _ => Error::IoPath {
+                path: out.clone(),
+                source: e,
+            },
         })?;
         drop(w);
         apply_meta(&out, mtime, mode);
@@ -147,7 +183,11 @@ pub(crate) fn extract(
     Ok((files, dirs, bytes))
 }
 
-pub(crate) fn copy_counting<R: Read + ?Sized>(r: &mut R, w: &mut impl io::Write, progress: &Progress) -> io::Result<u64> {
+pub(crate) fn copy_counting<R: Read + ?Sized>(
+    r: &mut R,
+    w: &mut impl io::Write,
+    progress: &Progress,
+) -> io::Result<u64> {
     let mut r = Counting::new(r, progress);
     let n = io::copy(&mut r, w)?;
     w.flush()?;

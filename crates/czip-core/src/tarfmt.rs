@@ -80,7 +80,15 @@ pub(crate) fn write(
         let mut h = tar::Header::new_gnu();
         let (secs, _) = to_unix(item.mtime);
         h.set_mtime(secs.max(0) as u64);
-        let mode = if item.mode == 0 { if item.is_dir { 0o755 } else { 0o644 } } else { item.mode };
+        let mode = if item.mode == 0 {
+            if item.is_dir {
+                0o755
+            } else {
+                0o644
+            }
+        } else {
+            item.mode
+        };
         h.set_mode(mode);
         if item.is_dir {
             h.set_entry_type(tar::EntryType::Directory);
@@ -91,7 +99,8 @@ pub(crate) fn write(
             h.set_size(item.size);
             let f = File::open(&item.path).map_err(Error::at(&item.path))?;
             let r = Counting::new(BufReader::with_capacity(1 << 20, f), progress);
-            b.append_data(&mut h, &item.name, r.take(item.size)).map_err(Error::at(&item.path))?;
+            b.append_data(&mut h, &item.name, r.take(item.size))
+                .map_err(Error::at(&item.path))?;
             progress.file_done();
         }
     }
@@ -182,13 +191,21 @@ pub(crate) fn extract(
 }
 
 /// A lone `.gz` / `.xz` / `.zst` file: decompress it next to its name.
-pub(crate) fn extract_single(path: &Path, dest: &Path, codec: Codec, progress: &Progress) -> Result<(u64, u64, u64)> {
+pub(crate) fn extract_single(
+    path: &Path,
+    dest: &Path,
+    codec: Codec,
+    progress: &Progress,
+) -> Result<(u64, u64, u64)> {
     let f = File::open(path).map_err(Error::at(path))?;
     progress.start(f.metadata()?.len());
     let name = single_name(path);
     let out = safe_join(dest, &name)?;
     progress.set_current(&name);
-    let mut d = decoder(codec, Counting::new(BufReader::with_capacity(1 << 20, f), progress))?;
+    let mut d = decoder(
+        codec,
+        Counting::new(BufReader::with_capacity(1 << 20, f), progress),
+    )?;
     let mut w = BufWriter::with_capacity(1 << 20, create_file(&out)?);
     let n = io::copy(&mut d, &mut w).map_err(Error::at(&out))?;
     io::Write::flush(&mut w).map_err(Error::at(&out))?;
@@ -207,11 +224,23 @@ pub(crate) fn single_info(path: &Path, codec: Codec) -> ArchiveInfo {
         format,
         encrypted: false,
         unpacked_bytes: 0,
-        entries: vec![ListEntry { path: single_name(path), is_dir: false, size: 0, mtime: None }],
+        entries: vec![ListEntry {
+            path: single_name(path),
+            is_dir: false,
+            size: 0,
+            mtime: None,
+        }],
     }
 }
 
 fn single_name(path: &Path) -> String {
-    let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-    if stem.is_empty() { "output".into() } else { stem }
+    let stem = path
+        .file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    if stem.is_empty() {
+        "output".into()
+    } else {
+        stem
+    }
 }

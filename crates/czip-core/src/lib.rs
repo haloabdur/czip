@@ -153,7 +153,9 @@ fn threads(n: usize) -> usize {
     if n > 0 {
         n
     } else {
-        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4)
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
     }
 }
 
@@ -178,7 +180,11 @@ pub fn compress(
 
     let mut scan = scan::scan(inputs)?;
     if let Ok(out) = std::path::absolute(output) {
-        scan.items.retain(|i| std::path::absolute(&i.path).map(|p| p != out).unwrap_or(true));
+        scan.items.retain(|i| {
+            std::path::absolute(&i.path)
+                .map(|p| p != out)
+                .unwrap_or(true)
+        });
     }
     if scan.items.is_empty() {
         return Err(Error::Empty);
@@ -217,7 +223,10 @@ pub fn compress(
 }
 
 fn temp_path(output: &Path) -> PathBuf {
-    let mut name = output.file_name().map(|n| n.to_os_string()).unwrap_or_default();
+    let mut name = output
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_default();
     name.push(".partial");
     output.with_file_name(name)
 }
@@ -259,7 +268,11 @@ fn detect(path: &Path) -> Result<Kind> {
     } else {
         return Err(Error::UnknownFormat);
     };
-    Ok(if tarfmt::is_tar(path, codec)? { Kind::Tar(codec) } else { Kind::Single(codec) })
+    Ok(if tarfmt::is_tar(path, codec)? {
+        Kind::Tar(codec)
+    } else {
+        Kind::Single(codec)
+    })
 }
 
 /// Lists an archive's contents without extracting.
@@ -296,25 +309,43 @@ pub fn extract(
         Kind::Single(c) => tarfmt::extract_single(archive, dest, c, progress),
     };
     let (files, dirs, bytes) = progress.settle(result)?;
-    Ok(ExtractSummary { files, dirs, bytes, elapsed: started.elapsed() })
+    Ok(ExtractSummary {
+        files,
+        dirs,
+        bytes,
+        elapsed: started.elapsed(),
+    })
 }
 
 /// Default archive path for a set of inputs: `<first input>.<ext>` beside
 /// it, or `Archive.<ext>` for several inputs, never overwriting a file.
 pub fn suggest_output(inputs: &[PathBuf], format: Format) -> PathBuf {
-    let first = inputs.first().cloned().unwrap_or_else(|| PathBuf::from("."));
+    let first = inputs
+        .first()
+        .cloned()
+        .unwrap_or_else(|| PathBuf::from("."));
     let dir = first.parent().map(Path::to_path_buf).unwrap_or_default();
     let stem = if inputs.len() == 1 {
-        let name = first.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = first
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
         if first.is_file() {
-            name.split_once('.').map(|(s, _)| s.to_string()).filter(|s| !s.is_empty()).unwrap_or(name)
+            name.split_once('.')
+                .map(|(s, _)| s.to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or(name)
         } else {
             name
         }
     } else {
         "Archive".to_string()
     };
-    let stem = if stem.is_empty() { "Archive".to_string() } else { stem };
+    let stem = if stem.is_empty() {
+        "Archive".to_string()
+    } else {
+        stem
+    };
     let ext = format.extension();
     let mut candidate = dir.join(format!("{stem}.{ext}"));
     let mut n = 2;
@@ -323,4 +354,69 @@ pub fn suggest_output(inputs: &[PathBuf], format: Format) -> PathBuf {
         n += 1;
     }
     candidate
+}
+
+/// Default extraction folder: beside the archive, named after it without
+/// its archive extension (`photos.tar.zst` → `photos`).
+pub fn suggest_extract_dir(archive: &Path) -> PathBuf {
+    let name = archive
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let lower = name.to_lowercase();
+    let stem = [
+        ".tar.zst", ".tar.gz", ".tar.xz", ".czip", ".zip", ".7z", ".tgz", ".txz", ".tzst", ".tar",
+        ".zst", ".gz", ".xz",
+    ]
+    .iter()
+    .find(|ext| lower.ends_with(*ext))
+    .map(|ext| &name[..name.len() - ext.len()])
+    .unwrap_or(&name);
+    archive.with_file_name(if stem.is_empty() { "extracted" } else { stem })
+}
+
+/// Where "extract everything" should go, and the folder to show afterwards.
+///
+/// An archive holding a single top-level folder or file that does not exist
+/// beside the archive yet is extracted right there, so `photos.czip` gives
+/// `photos/` and not `photos/photos/`. Anything else goes into a new folder
+/// named after the archive; existing folders are never reused.
+pub fn extract_plan(archive: &Path, info: &ArchiveInfo) -> (PathBuf, PathBuf) {
+    let parent = archive.parent().map(Path::to_path_buf).unwrap_or_default();
+    let roots: std::collections::BTreeSet<&str> = info
+        .entries
+        .iter()
+        .filter_map(|e| e.path.split('/').find(|p| !p.is_empty() && *p != "."))
+        .collect();
+    if roots.len() == 1 {
+        let root = parent.join(roots.first().expect("one root"));
+        if !root.exists() && fsutil::safe_join(&parent, roots.first().expect("one root")).is_ok() {
+            return (parent, root);
+        }
+    }
+    let base = suggest_extract_dir(archive);
+    let mut dest = base.clone();
+    let mut n = 2;
+    while dest.exists() {
+        let name = base
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        dest = base.with_file_name(format!("{name} ({n})"));
+        n += 1;
+    }
+    (dest.clone(), dest)
+}
+
+/// Whether `path` looks like something [`extract`] can open, by its name.
+pub fn looks_like_archive(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    [
+        ".czip", ".zip", ".7z", ".tar", ".tgz", ".txz", ".tzst", ".zst", ".gz", ".xz",
+    ]
+    .iter()
+    .any(|ext| name.ends_with(ext))
 }

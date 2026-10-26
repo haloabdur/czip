@@ -3,7 +3,9 @@ use std::io::{self, BufReader, BufWriter, Read};
 use std::path::{Path, PathBuf};
 
 use sevenz_rust2::encoder_options::{AesEncoderOptions, Lzma2Options};
-use sevenz_rust2::{ArchiveEntry, ArchiveReader, ArchiveWriter, EncoderConfiguration, Password, SourceReader};
+use sevenz_rust2::{
+    ArchiveEntry, ArchiveReader, ArchiveWriter, EncoderConfiguration, Password, SourceReader,
+};
 
 use crate::fsutil::{apply_meta, create_file, safe_join, selected};
 use crate::progress::Counting;
@@ -48,7 +50,8 @@ pub(crate) fn write(
         Level::Max => 9,
     };
     let mut w = ArchiveWriter::new(out)?;
-    let lzma: EncoderConfiguration = Lzma2Options::from_level_mt(preset, threads as u32, 64 << 20).into();
+    let lzma: EncoderConfiguration =
+        Lzma2Options::from_level_mt(preset, threads as u32, 64 << 20).into();
     match password {
         Some(pw) => {
             w.set_content_methods(vec![AesEncoderOptions::new(Password::new(pw)).into(), lzma]);
@@ -62,10 +65,17 @@ pub(crate) fn write(
     let mut readers = Vec::new();
     for item in &scan.items {
         if item.is_dir {
-            w.push_archive_entry::<File>(ArchiveEntry::from_path(&item.path, item.name.clone()), None)?;
+            w.push_archive_entry::<File>(
+                ArchiveEntry::from_path(&item.path, item.name.clone()),
+                None,
+            )?;
         } else {
             entries.push(ArchiveEntry::from_path(&item.path, item.name.clone()));
-            readers.push(SourceReader::new(LazyFile { path: item.path.clone(), file: None, progress }));
+            readers.push(SourceReader::new(LazyFile {
+                path: item.path.clone(),
+                file: None,
+                progress,
+            }));
         }
     }
     if !entries.is_empty() {
@@ -91,7 +101,9 @@ pub(crate) fn info(path: &Path, password: Option<&str>) -> Result<ArchiveInfo> {
             path: e.name().trim_end_matches('/').to_string(),
             is_dir: e.is_directory,
             size: e.size,
-            mtime: e.has_last_modified_date.then(|| e.last_modified_date.into()),
+            mtime: e
+                .has_last_modified_date
+                .then(|| e.last_modified_date.into()),
         })
         .collect();
     Ok(ArchiveInfo {
@@ -133,7 +145,9 @@ pub(crate) fn extract(
         }
         let mut step = || -> Result<()> {
             let out = safe_join(dest, name)?;
-            let mtime = entry.has_last_modified_date.then(|| entry.last_modified_date.into());
+            let mtime = entry
+                .has_last_modified_date
+                .then(|| entry.last_modified_date.into());
             if entry.is_directory {
                 std::fs::create_dir_all(&out).map_err(Error::at(&out))?;
                 dir_meta.push((out, mtime));
@@ -142,7 +156,8 @@ pub(crate) fn extract(
             }
             progress.set_current(name);
             let mut w = BufWriter::with_capacity(1 << 20, create_file(&out)?);
-            let n = crate::zipfmt::copy_counting(data, &mut w, progress).map_err(Error::at(&out))?;
+            let n =
+                crate::zipfmt::copy_counting(data, &mut w, progress).map_err(Error::at(&out))?;
             drop(w);
             apply_meta(&out, mtime, 0);
             files += 1;

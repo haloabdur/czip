@@ -81,7 +81,8 @@ pub(crate) fn selected(only: Option<&[String]>, name: &str) -> bool {
     let name = name.trim_end_matches('/');
     only.iter().any(|s| {
         let s = s.trim_end_matches('/');
-        name == s || (name.len() > s.len() && name.starts_with(s) && name.as_bytes()[s.len()] == b'/')
+        name == s
+            || (name.len() > s.len() && name.starts_with(s) && name.as_bytes()[s.len()] == b'/')
     })
 }
 
@@ -132,7 +133,14 @@ pub(crate) fn civil(t: SystemTime) -> (i64, u8, u8, u8, u8, u8) {
     let d = (doy - (153 * mp + 2) / 5 + 1) as u8;
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u8;
     let y = yoe + era * 400 + i64::from(m <= 2);
-    (y, m, d, (rem / 3600) as u8, (rem % 3600 / 60) as u8, (rem % 60) as u8)
+    (
+        y,
+        m,
+        d,
+        (rem / 3600) as u8,
+        (rem % 3600 / 60) as u8,
+        (rem % 60) as u8,
+    )
 }
 
 pub(crate) fn from_civil(y: i64, m: u8, d: u8, hh: u8, mm: u8, ss: u8) -> Option<SystemTime> {
@@ -157,7 +165,9 @@ mod tests {
         let d = Path::new("/tmp/out");
         assert!(safe_join(d, "../x").is_err());
         assert!(safe_join(d, "a/../../x").is_err());
-        assert!(safe_join(d, "/etc/passwd").map(|p| p.starts_with(d)).unwrap_or(true));
+        assert!(safe_join(d, "/etc/passwd")
+            .map(|p| p.starts_with(d))
+            .unwrap_or(true));
         assert_eq!(safe_join(d, "a/b.txt").unwrap(), d.join("a").join("b.txt"));
         assert!(safe_join(d, "").is_err());
     }

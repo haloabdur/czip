@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>czip</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="mock.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+      <symbol id="i-archive" viewBox="0 0 24 24"><path d="M21 8v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+      <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
+    </defs>
+  </svg>
+
+  <header class="topbar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="8"/><path d="M14 6v16M11 9h3M14 12h3M11 15h3M14 18h3"/></svg>
+      <span>czip</span>
+    </div>
+    <nav class="tabs" aria-label="Utama">
+      <button type="button" class="tab" data-tab="compress" aria-current="page">Kompres</button>
+      <button type="button" class="tab" data-tab="extract">Ekstrak</button>
+    </nav>
+    <span class="topbar-spacer"></span>
+  </header>
+
+  <div id="toast" class="toast" role="alert" hidden>
+    <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+    <div><strong id="toast-title"></strong><span id="toast-detail"></span></div>
+    <button type="button" class="icon-btn" id="toast-close" aria-label="Tutup pesan"><svg class="ico"><use href="#i-x"/></svg></button>
+  </div>
+
+  <main>
+    <!-- 1 · Home -->
+    <section id="view-home" class="view narrow">
+      <div class="heading">
+        <h1>Kompres file &amp; folder</h1>
+        <p class="lead">Tarik apa saja ke sini, berapa pun banyaknya file dan folder.</p>
+      </div>
+      <div class="dropzone" id="home-drop">
+        <div class="drop-icon"><svg class="ico lg" aria-hidden="true"><use href="#i-upload"/></svg></div>
+        <div>
+          <p class="drop-title">Tarik file atau folder ke sini</p>
+          <p class="muted small">atau pilih dari komputer</p>
+        </div>
+        <div class="row-center">
+          <button type="button" class="btn primary" data-action="pick-files"><svg class="ico" aria-hidden="true"><use href="#i-file"/></svg>Pilih file</button>
+          <button type="button" class="btn" data-action="pick-folders"><svg class="ico" aria-hidden="true"><use href="#i-folder"/></svg>Pilih folder</button>
+        </div>
+        <p class="muted small">Buat .czip, .zip, .7z, .tar.zst · Buka juga .tar.gz, .tar.xz, .gz, .xz</p>
+      </div>
+      <section id="recent" class="stack" hidden aria-labelledby="recent-h">
+        <div class="row-between">
+          <h2 id="recent-h">Terakhir dibuat</h2>
+          <button type="button" class="link" data-action="clear-recent">Hapus riwayat</button>
+        </div>
+        <ul class="list" id="recent-list"></ul>
+      </section>
+    </section>
+
+    <!-- 2 · Queue & settings -->
+    <section id="view-queue" class="view wide" hidden>
+      <section class="queue-col stack" aria-labelledby="q-title">
+        <div class="row-between wrap">
+          <div>
+            <h1 id="q-title">0 item siap dikompres</h1>
+            <p class="muted" id="q-summary"></p>
+          </div>
+          <div class="row">
+            <button type="button" class="btn" data-action="pick-files"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>File</button>
+            <button type="button" class="btn" data-action="pick-folders"><svg class="ico" aria-hidden="true"><use href="#i-plus"/></svg>Folder</button>
+            <button type="button" class="btn ghost" data-action="clear-queue">Kosongkan</button>
+          </div>
+        </div>
+        <ul class="list" id="queue-list"></ul>
+        <div class="list-foot"><svg class="ico" aria-hidden="true"><use href="#i-upload"/></svg>Tarik lagi ke sini untuk menambah</div>
+        <div class="note">
+          <svg class="ico" aria-hidden="true"><use href="#i-info"/></svg>
+          <span>czip memeriksa isi tiap file. Foto, video, dan arsip yang sudah terkompresi disimpan apa adanya agar tidak membuang waktu, sedangkan file yang sama persis hanya disimpan sekali.</span>
+        </div>
+      </section>
+
+      <aside class="panel stack-lg" aria-labelledby="s-title">
+        <h2 id="s-title">Pengaturan arsip</h2>
+        <div class="field">
+          <label for="arc-name">Nama arsip</label>
+          <div class="input-group">
+            <input id="arc-name" type="text" autocomplete="off" spellcheck="false">
+            <span class="suffix mono" id="arc-ext">.czip</span>
+          </div>
+        </div>
+        <fieldset class="field">
+          <legend>Format</legend>
+          <div class="grid-2" id="format-options"></div>
+        </fieldset>
+        <fieldset class="field">
+          <legend>Tingkat kompresi</legend>
+          <div class="stack-sm" id="level-options"></div>
+        </fieldset>
+        <div class="field">
+          <label class="check"><input type="checkbox" id="use-pw"><span>Kunci dengan kata sandi <span class="muted small" id="pw-hint"></span></span></label>
+          <div class="stack-sm" id="pw-fields" hidden>
+            <label class="sr-only" for="pw1">Kata sandi</label>
+            <input id="pw1" type="password" placeholder="Kata sandi" autocomplete="new-password">
+            <label class="sr-only" for="pw2">Ulangi kata sandi</label>
+            <input id="pw2" type="password" placeholder="Ulangi kata sandi" autocomplete="new-password">
+            <p class="muted small">Simpan kata sandi ini baik-baik. Tanpanya arsip tidak bisa dibuka.</p>
+          </div>
+        </div>
+        <div class="row-between divider-top">
+          <div class="min0">
+            <span class="muted small block">Simpan ke</span>
+            <span class="mono small ellipsis block" id="out-dir"></span>
+          </div>
+          <button type="button" class="btn" data-action="pick-out-dir">Ubah</button>
+        </div>
+        <button type="button" class="btn primary big" id="go-compress">Kompres<svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+      </aside>
+    </section>
+
+    <!-- 3 · Progress -->
+    <section id="view-progress" class="view narrow" hidden>
+      <section class="card stack-lg" aria-labelledby="p-title">
+        <div class="row-between wrap end">
+          <div class="min0">
+            <h1 id="p-title" class="ellipsis">Mengompres…</h1>
+            <p class="muted" id="p-sub"></p>
+          </div>
+          <span class="big-num mono" id="p-pct">0%</span>
+        </div>
+        <div class="bar" role="progressbar" aria-label="Kemajuan" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="p-bar"><div></div></div>
+        <div class="stats">
+          <div><span class="muted small">Diproses</span><span class="mono" id="p-done">–</span></div>
+          <div><span class="muted small">Kecepatan</span><span class="mono" id="p-speed">–</span></div>
+          <div><span class="muted small">File selesai</span><span class="mono" id="p-files">–</span></div>
+          <div><span class="muted small">Sisa waktu</span><span class="mono" id="p-eta">–</span></div>
+        </div>
+        <div class="current"><span class="dot"></span><span class="mono small ellipsis" id="p-current">Menyiapkan…</span></div>
+        <div class="row-end">
+          <button type="button" class="btn danger-text" data-action="cancel">Batalkan</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- 4 · Done -->
+    <section id="view-done" class="view narrow" hidden>
+      <section class="card stack-lg center" aria-labelledby="d-title">
+        <div class="ok-icon"><svg class="ico lg" aria-hidden="true"><use href="#i-check"/></svg></div>
+        <div>
+          <h1 id="d-title">Selesai</h1>
+          <p class="muted" id="d-sub"></p>
+        </div>
+        <div class="row-center wrap" id="d-sizes">
+          <span class="mono size-before" id="d-before"></span>
+          <svg class="ico muted" aria-hidden="true"><use href="#i-arrow"/></svg>
+          <span class="mono size-after" id="d-after"></span>
+          <span class="pill ok" id="d-saved"></span>
+        </div>
+        <div class="file-card">
+          <div class="file-icon dark"><svg class="ico" aria-hidden="true"><use id="d-icon" href="#i-archive"/></svg></div>
+          <div class="min0 grow left">
+            <span class="strong ellipsis block" id="d-name"></span>
+            <span class="mono small muted ellipsis block" id="d-path"></span>
+          </div>
+          <button type="button" class="icon-btn bordered" data-action="copy-path" aria-label="Salin lokasi"><svg class="ico"><use href="#i-copy"/></svg></button>
+        </div>
+        <div class="row-center wrap">
+          <button type="button" class="btn primary" data-action="reveal-result"><svg class="ico" aria-hidden="true"><use href="#i-folder"/></svg><span id="d-reveal-label">Tampilkan di folder</span></button>
+          <button type="button" class="btn" data-action="again" id="d-again">Kompres lagi</button>
+        </div>
+      </section>
+    </section>
+
+    <!-- 5 · Extract -->
+    <section id="view-extract" class="view medium" hidden>
+      <div id="x-empty" class="stack-lg">
+        <div class="heading">
+          <h1>Ekstrak arsip</h1>
+          <p class="lead">Buka .czip, .zip, .7z, .tar.zst, .tar.gz, .tar.xz, .gz, .xz, atau .zst.</p>
+        </div>
+        <div class="dropzone">
+          <div class="drop-icon"><svg class="ico lg" aria-hidden="true"><use href="#i-archive"/></svg></div>
+          <p class="drop-title">Tarik arsip ke sini</p>
+          <button type="button" class="btn primary" data-action="pick-archive">Pilih arsip</button>
+        </div>
+      </div>
+
+      <div id="x-password" class="card stack narrow-card" hidden>
+        <div class="row"><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg><h2 id="x-pw-title">Arsip ini dikunci</h2></div>
+        <p class="muted" id="x-pw-file"></p>
+        <form class="row" id="x-pw-form">
+          <label class="sr-only" for="x-pw">Kata sandi</label>
+          <input id="x-pw" type="password" placeholder="Kata sandi" autocomplete="current-password" class="grow">
+          <button type="submit" class="btn primary">Buka</button>
+        </form>
+        <p class="error small" id="x-pw-error" hidden>Kata sandi salah. Coba lagi.</p>
+        <button type="button" class="link self-start" data-action="close-archive">Pilih arsip lain</button>
+      </div>
+
+      <div id="x-browser" class="stack" hidden>
+        <div class="row wrap">
+          <div class="file-icon dark big"><svg class="ico" aria-hidden="true"><use href="#i-archive"/></svg></div>
+          <div class="grow min0">
+            <h1 class="ellipsis" id="x-name"></h1>
+            <p class="muted" id="x-meta"></p>
+          </div>
+          <div class="row wrap">
+            <button type="button" class="btn" id="x-extract-sel" disabled>Ekstrak terpilih</button>
+            <button type="button" class="btn primary" data-action="extract-all"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>Ekstrak semua</button>
+          </div>
+        </div>
+        <div class="row wrap">
+          <nav class="crumbs grow" aria-label="Lokasi di arsip" id="x-crumbs"></nav>
+          <div class="search">
+            <svg class="ico muted" aria-hidden="true"><use href="#i-search"/></svg>
+            <label class="sr-only" for="x-search">Cari di arsip</label>
+            <input id="x-search" type="search" placeholder="Cari di arsip">
+          </div>
+        </div>
+        <div class="table-box">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-check"><input type="checkbox" id="x-all" aria-label="Pilih semua di folder ini"></th>
+                <th>Nama</th>
+                <th class="num">Ukuran</th>
+                <th>Diubah</th>
+              </tr>
+            </thead>
+            <tbody id="x-rows"></tbody>
+          </table>
+          <p class="muted small empty-row" id="x-none" hidden>Tidak ada yang cocok.</p>
+        </div>
+        <div class="bar-card row-between wrap">
+          <div class="min0">
+            <span class="muted small block">Ekstrak ke</span>
+            <span class="mono small ellipsis block" id="x-dest"></span>
+          </div>
+          <div class="row wrap">
+            <label class="check"><input type="checkbox" id="x-open-after" checked><span>Buka folder setelah selesai</span></label>
+            <button type="button" class="btn" data-action="pick-dest">Ubah</button>
+            <button type="button" class="btn ghost" data-action="close-archive">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="drop-overlay" id="drop-overlay" hidden><div><svg class="ico lg" aria-hidden="true"><use href="#i-upload"/></svg><p id="drop-overlay-text">Lepaskan untuk menambahkan</p></div></div>
+</body>
+</html>

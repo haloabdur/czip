@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
@@ -8,7 +8,11 @@ use czip_core::{CompressOptions, ExtractOptions, Format, Level, Progress};
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 
 #[derive(Parser)]
-#[command(name = "czip", version, about = "Fast, strong compression for files and folders")]
+#[command(
+    name = "czip",
+    version,
+    about = "Fast, strong compression for files and folders"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -87,10 +91,22 @@ fn run(cli: Cli) -> Result<(), czip_core::Error> {
     }
 
     match cli.cmd {
-        Cmd::Compress { inputs, output, format, level, password, threads } => {
+        Cmd::Compress {
+            inputs,
+            output,
+            format,
+            level,
+            password,
+            threads,
+        } => {
             let password = resolve_password(password, true)?;
             let output = output.unwrap_or_else(|| czip_core::suggest_output(&inputs, format));
-            let opts = CompressOptions { format, level, password, threads };
+            let opts = CompressOptions {
+                format,
+                level,
+                password,
+                threads,
+            };
             let job = {
                 let (p, output) = (progress.clone(), output.clone());
                 thread::spawn(move || czip_core::compress(&inputs, &output, &opts, &p))
@@ -106,13 +122,32 @@ fn run(cli: Cli) -> Result<(), czip_core::Error> {
                 s.elapsed.as_secs_f64()
             );
             if !s.skipped.is_empty() {
-                eprintln!("skipped {} symlink(s) or unreadable entries", s.skipped.len());
+                eprintln!(
+                    "skipped {} symlink(s) or unreadable entries",
+                    s.skipped.len()
+                );
             }
         }
-        Cmd::Extract { archive, output, only, password, threads } => {
+        Cmd::Extract {
+            archive,
+            output,
+            only,
+            password,
+            threads,
+        } => {
             let password = resolve_password(password, false)?;
-            let dest = output.unwrap_or_else(|| default_dest(&archive));
-            let opts = ExtractOptions { password, only: only.clone(), threads };
+            let dest = match output {
+                Some(o) => o,
+                None => match czip_core::list(&archive, password.as_deref()) {
+                    Ok(info) => czip_core::extract_plan(&archive, &info).0,
+                    Err(_) => czip_core::suggest_extract_dir(&archive),
+                },
+            };
+            let opts = ExtractOptions {
+                password,
+                only: only.clone(),
+                threads,
+            };
             let job = {
                 let (p, dest, archive) = (progress.clone(), dest.clone(), archive.clone());
                 thread::spawn(move || czip_core::extract(&archive, &dest, &opts, &p))
@@ -120,7 +155,13 @@ fn run(cli: Cli) -> Result<(), czip_core::Error> {
             let s = match watch(job, &progress, "Extracting") {
                 Err(czip_core::Error::PasswordRequired) => {
                     return run(Cli {
-                        cmd: Cmd::Extract { archive, output: Some(dest), only, password: Some(String::new()), threads },
+                        cmd: Cmd::Extract {
+                            archive,
+                            output: Some(dest),
+                            only,
+                            password: Some(String::new()),
+                            threads,
+                        },
                     })
                 }
                 r => r?,
@@ -168,23 +209,14 @@ fn resolve_password(p: Option<String>, confirm: bool) -> Result<Option<String>, 
         Some(p) if p.is_empty() => {
             let pw = rpassword::prompt_password("Password: ")?;
             if confirm && rpassword::prompt_password("Repeat password: ")? != pw {
-                return Err(czip_core::Error::Unsupported("passwords do not match".into()));
+                return Err(czip_core::Error::Unsupported(
+                    "passwords do not match".into(),
+                ));
             }
             Ok(Some(pw).filter(|p| !p.is_empty()))
         }
         other => Ok(other.or_else(|| std::env::var("CZIP_PASSWORD").ok())),
     }
-}
-
-fn default_dest(archive: &Path) -> PathBuf {
-    let name = archive.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let lower = name.to_lowercase();
-    let stem = [".tar.zst", ".tar.gz", ".tar.xz", ".czip", ".zip", ".7z", ".tgz", ".tar", ".zst", ".gz", ".xz"]
-        .iter()
-        .find(|ext| lower.ends_with(*ext))
-        .map(|ext| &name[..name.len() - ext.len()])
-        .unwrap_or(&name);
-    archive.with_file_name(if stem.is_empty() { "extracted" } else { stem })
 }
 
 fn watch<T: Send + 'static>(

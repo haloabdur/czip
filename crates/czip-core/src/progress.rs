@@ -48,7 +48,12 @@ impl Progress {
             total_bytes: self.inner.total.load(Ordering::Relaxed),
             done_bytes: self.inner.done.load(Ordering::Relaxed),
             files_done: self.inner.files_done.load(Ordering::Relaxed),
-            current: self.inner.current.lock().map(|c| c.clone()).unwrap_or_default(),
+            current: self
+                .inner
+                .current
+                .lock()
+                .map(|c| c.clone())
+                .unwrap_or_default(),
         }
     }
 

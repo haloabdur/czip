@@ -68,11 +68,20 @@ struct Params {
 
 fn params(level: Level) -> Params {
     match level {
-        Level::Fast => Params { level: 3, long_window: 0 },
-        Level::Balanced => Params { level: 9, long_window: 0 },
+        Level::Fast => Params {
+            level: 3,
+            long_window: 0,
+        },
+        Level::Balanced => Params {
+            level: 9,
+            long_window: 0,
+        },
         // A 128 MiB window finds repeats far apart (similar files, vendored
         // copies), which is where most of the gain over level 9 comes from.
-        Level::Max => Params { level: 19, long_window: MAX_WINDOW_LOG },
+        Level::Max => Params {
+            level: 19,
+            long_window: MAX_WINDOW_LOG,
+        },
     }
 }
 
@@ -137,7 +146,15 @@ pub(crate) fn write(
     threads: usize,
     progress: &Progress,
 ) -> Result<u64> {
-    write_with(scan, out, level, password, threads, progress, [SEGMENT, STORE_BLOCK])
+    write_with(
+        scan,
+        out,
+        level,
+        password,
+        threads,
+        progress,
+        [SEGMENT, STORE_BLOCK],
+    )
 }
 
 /// `limits`: raw bytes per compressed segment and per stored block.
@@ -164,7 +181,12 @@ fn write_with(
             for v in [crypto::KDF_M, crypto::KDF_T, crypto::KDF_P] {
                 header.extend_from_slice(&v.to_le_bytes());
             }
-            Some(Cipher::derive(pw, &salt, prefix, (crypto::KDF_M, crypto::KDF_T, crypto::KDF_P))?)
+            Some(Cipher::derive(
+                pw,
+                &salt,
+                prefix,
+                (crypto::KDF_M, crypto::KDF_T, crypto::KDF_P),
+            )?)
         }
         None => {
             header.extend_from_slice(&0u16.to_le_bytes());
@@ -303,7 +325,11 @@ impl Writer<'_> {
             if contiguous {
                 e.extents.last_mut().expect("waiting extent exists").len += take as u32;
             } else {
-                e.extents.push(Extent { block: u32::MAX, offset: off, len: take as u32 });
+                e.extents.push(Extent {
+                    block: u32::MAX,
+                    offset: off,
+                    len: take as u32,
+                });
                 open.waiting.push((idx, e.extents.len() - 1));
             }
             open.raw += take;
@@ -313,7 +339,10 @@ impl Writer<'_> {
                     if self.encoder.is_none() {
                         self.encoder = Some(new_encoder(&self.p, self.threads)?);
                     }
-                    self.encoder.as_mut().expect("created above").write_all(&data[..take])?;
+                    self.encoder
+                        .as_mut()
+                        .expect("created above")
+                        .write_all(&data[..take])?;
                 }
                 Class::Store => self.store_buf.extend_from_slice(&data[..take]),
             }
@@ -346,7 +375,12 @@ impl Writer<'_> {
             None => data,
         };
         self.out.write_all(&data)?;
-        self.blocks.push(BlockInfo { method, offset: self.pos, stored: data.len() as u64, raw: open.raw as u64 });
+        self.blocks.push(BlockInfo {
+            method,
+            offset: self.pos,
+            stored: data.len() as u64,
+            raw: open.raw as u64,
+        });
         self.pos += data.len() as u64;
         Ok(())
     }
@@ -383,7 +417,9 @@ fn new_encoder(p: &Params, threads: u32) -> Result<Encoder> {
         e.long_distance_matching(true)?;
         e.window_log(p.long_window)?;
         e.set_parameter(zstd::stream::raw::CParameter::JobSize(LONG_JOB_SIZE))?;
-        e.set_parameter(zstd::stream::raw::CParameter::OverlapSizeLog(LONG_OVERLAP_LOG))?;
+        e.set_parameter(zstd::stream::raw::CParameter::OverlapSizeLog(
+            LONG_OVERLAP_LOG,
+        ))?;
     }
     Ok(e)
 }
@@ -457,8 +493,15 @@ fn encode_index(blocks: &[BlockInfo], entries: &[Entry]) -> Vec<u8> {
     b.extend(entries.iter().map(|e| u8::from(e.is_dir)));
     let mut prev: &str = "";
     for e in entries {
-        let shared = prev.bytes().zip(e.path.bytes()).take_while(|(a, b)| a == b).count();
-        let shared = (0..=shared).rev().find(|&n| e.path.is_char_boundary(n)).unwrap_or(0);
+        let shared = prev
+            .bytes()
+            .zip(e.path.bytes())
+            .take_while(|(a, b)| a == b)
+            .count();
+        let shared = (0..=shared)
+            .rev()
+            .find(|&n| e.path.is_char_boundary(n))
+            .unwrap_or(0);
         put_var(&mut b, shared as u64);
         put_var(&mut b, (e.path.len() - shared) as u64);
         b.extend_from_slice(&e.path.as_bytes()[shared..]);
@@ -541,7 +584,8 @@ impl<'a> Cursor<'a> {
         Err(Error::Corrupt("bad number in index".into()))
     }
     fn var32(&mut self) -> Result<u32> {
-        u32::try_from(self.var()?).map_err(|_| Error::Corrupt("number out of range in index".into()))
+        u32::try_from(self.var()?)
+            .map_err(|_| Error::Corrupt("number out of range in index".into()))
     }
 }
 
@@ -554,8 +598,16 @@ fn decode_index(data: &[u8], index_off: u64) -> Result<(Vec<BlockInfo>, Vec<Entr
     }
     let mut blocks = Vec::with_capacity(nblocks);
     for _ in 0..nblocks {
-        let b = BlockInfo { method: c.u8()?, offset: c.u64()?, stored: c.u64()?, raw: c.u64()? };
-        let in_file = b.offset.checked_add(b.stored).is_some_and(|end| end <= index_off);
+        let b = BlockInfo {
+            method: c.u8()?,
+            offset: c.u64()?,
+            stored: c.u64()?,
+            raw: c.u64()?,
+        };
+        let in_file = b
+            .offset
+            .checked_add(b.stored)
+            .is_some_and(|end| end <= index_off);
         if b.method > M_ZSTD || b.raw > MAX_BLOCK_RAW || !in_file {
             return Err(bad("block table entry out of range"));
         }
@@ -589,7 +641,9 @@ fn decode_index(data: &[u8], index_off: u64) -> Result<(Vec<BlockInfo>, Vec<Entr
         mtimes.push(last);
     }
     let modes = (0..n).map(|_| c.var32()).collect::<Result<Vec<_>>>()?;
-    let hashes = (0..n).map(|_| c.arr::<HASH_LEN>()).collect::<Result<Vec<_>>>()?;
+    let hashes = (0..n)
+        .map(|_| c.arr::<HASH_LEN>())
+        .collect::<Result<Vec<_>>>()?;
 
     let mut entries = Vec::with_capacity(n);
     let (mut blk, mut end) = (0u32, 0u32);
@@ -606,11 +660,18 @@ fn decode_index(data: &[u8], index_off: u64) -> Result<(Vec<BlockInfo>, Vec<Entr
             let block = num(i64::from(blk) + unzigzag(c.var()?))?;
             let guess = if block == blk { end } else { 0 };
             let offset = num(i64::from(guess) + unzigzag(c.var()?))?;
-            let len = if nx > 1 { c.var32()? } else { num(sizes[i] as i64)? };
+            let len = if nx > 1 {
+                c.var32()?
+            } else {
+                num(sizes[i] as i64)?
+            };
             let x = Extent { block, offset, len };
             blk = block;
             end = offset.saturating_add(len);
-            let raw = blocks.get(x.block as usize).ok_or_else(|| bad("extent names a missing block"))?.raw;
+            let raw = blocks
+                .get(x.block as usize)
+                .ok_or_else(|| bad("extent names a missing block"))?
+                .raw;
             if u64::from(x.offset) + u64::from(x.len) > raw {
                 return Err(bad("extent out of block range"));
             }
@@ -668,9 +729,13 @@ impl Archive {
             let mut h = [0u8; SALT_LEN + PREFIX_LEN + 12];
             read_at(&file, 8, &mut h).map_err(|_| Error::Corrupt("header is truncated".into()))?;
             header_len += h.len() as u64;
-            let pw = password.filter(|p| !p.is_empty()).ok_or(Error::PasswordRequired)?;
+            let pw = password
+                .filter(|p| !p.is_empty())
+                .ok_or(Error::PasswordRequired)?;
             let salt: [u8; SALT_LEN] = h[..SALT_LEN].try_into().expect("sized");
-            let prefix: [u8; PREFIX_LEN] = h[SALT_LEN..SALT_LEN + PREFIX_LEN].try_into().expect("sized");
+            let prefix: [u8; PREFIX_LEN] = h[SALT_LEN..SALT_LEN + PREFIX_LEN]
+                .try_into()
+                .expect("sized");
             let k = &h[SALT_LEN + PREFIX_LEN..];
             let u = |i: usize| u32::from_le_bytes(k[i * 4..i * 4 + 4].try_into().expect("sized"));
             let (m, t, p) = (u(0), u(1), u(2));
@@ -688,7 +753,9 @@ impl Archive {
         let mut foot = [0u8; FOOTER_LEN as usize];
         read_at(&file, len - FOOTER_LEN, &mut foot).map_err(at())?;
         if &foot[16..] != END_MAGIC {
-            return Err(Error::Corrupt("missing end marker (incomplete download?)".into()));
+            return Err(Error::Corrupt(
+                "missing end marker (incomplete download?)".into(),
+            ));
         }
         let index_off = u64::from_le_bytes(foot[..8].try_into().expect("sized"));
         let index_len = u64::from_le_bytes(foot[8..16].try_into().expect("sized"));
@@ -703,7 +770,13 @@ impl Archive {
         let index = zstd::stream::decode_all(&index[..])
             .map_err(|_| Error::Corrupt("index does not decompress".into()))?;
         let (blocks, entries) = decode_index(&index, index_off)?;
-        Ok(Self { file, cipher, blocks, entries, encrypted })
+        Ok(Self {
+            file,
+            cipher,
+            blocks,
+            entries,
+            encrypted,
+        })
     }
 
     pub(crate) fn info(&self) -> ArchiveInfo {
@@ -809,8 +882,11 @@ impl Archive {
                         .filter(|b| !cache.contains_key(b) && seen.insert(*b))
                         .take(par)
                         .collect();
-                    let decoded: Vec<Result<(u32, Vec<u8>)>> =
-                        pool.install(|| wave.par_iter().map(|&b| Ok((b, self.decode_block(b)?))).collect());
+                    let decoded: Vec<Result<(u32, Vec<u8>)>> = pool.install(|| {
+                        wave.par_iter()
+                            .map(|&b| Ok((b, self.decode_block(b)?)))
+                            .collect()
+                    });
                     for d in decoded {
                         let (b, data) = d?;
                         cache.insert(b, Arc::new(data));
@@ -858,7 +934,9 @@ mod tests {
                 })
                 .collect::<Vec<u8>>()
         };
-        let text: Vec<u8> = (0..40_000).flat_map(|i| format!("{i} lorem\n").into_bytes()).collect();
+        let text: Vec<u8> = (0..40_000)
+            .flat_map(|i| format!("{i} lorem\n").into_bytes())
+            .collect();
         let files: Vec<(String, Vec<u8>)> = vec![
             ("a.txt".into(), text.clone()),
             ("b.bin".into(), noise()),
@@ -872,11 +950,23 @@ mod tests {
         let s = crate::scan::scan(&[src]).unwrap();
         let archive = tmp.path().join("a.czip");
         let p = Progress::new();
-        write_with(&s, File::create(&archive).unwrap(), Level::Fast, Some("pw"), 2, &p, [64 << 10, 16 << 10])
-            .unwrap();
+        write_with(
+            &s,
+            File::create(&archive).unwrap(),
+            Level::Fast,
+            Some("pw"),
+            2,
+            &p,
+            [64 << 10, 16 << 10],
+        )
+        .unwrap();
 
         let a = Archive::open(&archive, Some("pw")).unwrap();
-        assert!(a.blocks.len() > 20, "expected many blocks, got {}", a.blocks.len());
+        assert!(
+            a.blocks.len() > 20,
+            "expected many blocks, got {}",
+            a.blocks.len()
+        );
         assert!(a.blocks.iter().any(|b| b.method == M_STORE));
         assert!(a.blocks.iter().any(|b| b.method == M_ZSTD));
         let dest = tmp.path().join("x");

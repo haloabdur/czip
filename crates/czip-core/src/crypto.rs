@@ -34,7 +34,10 @@ impl Cipher {
         Argon2::new(Algorithm::Argon2id, Version::V0x13, params)
             .hash_password_into(password.as_bytes(), salt, &mut key)
             .map_err(|e| Error::Corrupt(format!("key derivation failed: {e}")))?;
-        Ok(Self { aead: XChaCha20Poly1305::new(&Key::from(key)), prefix })
+        Ok(Self {
+            aead: XChaCha20Poly1305::new(&Key::from(key)),
+            prefix,
+        })
     }
 
     fn nonce(&self, counter: u64) -> XNonce {
@@ -46,12 +49,26 @@ impl Cipher {
 
     pub(crate) fn seal(&self, counter: u64, data: &[u8]) -> Result<Vec<u8>> {
         self.aead
-            .encrypt(&self.nonce(counter), Payload { msg: data, aad: AAD })
+            .encrypt(
+                &self.nonce(counter),
+                Payload {
+                    msg: data,
+                    aad: AAD,
+                },
+            )
             .map_err(|_| Error::Corrupt("encryption failed".into()))
     }
 
     pub(crate) fn open(&self, counter: u64, data: &[u8]) -> Option<Vec<u8>> {
-        self.aead.decrypt(&self.nonce(counter), Payload { msg: data, aad: AAD }).ok()
+        self.aead
+            .decrypt(
+                &self.nonce(counter),
+                Payload {
+                    msg: data,
+                    aad: AAD,
+                },
+            )
+            .ok()
     }
 }
 

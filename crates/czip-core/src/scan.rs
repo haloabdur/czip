@@ -84,7 +84,11 @@ pub fn scan(inputs: &[PathBuf]) -> Result<Scan> {
             let entry = match entry {
                 Ok(e) => e,
                 Err(e) => {
-                    out.skipped.push(e.path().map(Path::to_path_buf).unwrap_or_else(|| input.clone()));
+                    out.skipped.push(
+                        e.path()
+                            .map(Path::to_path_buf)
+                            .unwrap_or_else(|| input.clone()),
+                    );
                     continue;
                 }
             };

@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
-members = ["crates/czip-core", "crates/czip-cli"]
-
+members = ["crates/czip-core", "crates/czip-cli", "app/src-tauri"]
+# The desktop app needs WebView system libraries; build it explicitly.
+default-members = ["crates/czip-core", "crates/czip-cli"]
 
 [workspace.package]
 version = "0.1.0"
