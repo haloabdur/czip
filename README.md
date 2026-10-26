@@ -9,6 +9,24 @@ Tarik banyak file dan folder sekaligus, pilih tingkat kompresi, selesai.
   membuka `.czip`, `.zip`, `.7z`, `.tar`, `.tar.zst/.gz/.xz`, serta `.gz`/`.xz`/`.zst` tunggal.
 - **Aplikasi desktop** (Tauri 2, Windows/macOS/Linux) dan **CLI**.
 
+## Unduh & instal
+
+Ambil installer dari halaman [Releases](https://github.com/haloabdur/czip/releases/latest):
+
+| Sistem | File | Cara instal |
+|---|---|---|
+| Windows 10/11 | `czip_x.y.z_x64-setup.exe` atau `czip_x.y.z_x64_en-US.msi` | jalankan installer |
+| macOS 11+ (Apple Silicon & Intel) | `czip_x.y.z_universal.dmg` | buka, seret czip ke Applications |
+| Debian / Ubuntu | `czip_x.y.z_amd64.deb` | `sudo apt install ./czip_x.y.z_amd64.deb` |
+| Fedora / openSUSE | `czip-x.y.z-1.x86_64.rpm` | `sudo dnf install ./czip-*.rpm` |
+| Linux lain | `czip_x.y.z_amd64.AppImage` | `chmod +x` lalu jalankan |
+
+Installer belum ditandatangani. Windows bisa menampilkan SmartScreen — pilih
+**More info → Run anyway**. Di macOS, klik kanan aplikasi → **Open** saat pertama kali dibuka.
+Di Linux butuh WebKitGTK 4.1 (sudah ada di Ubuntu 22.04+, Debian 12+, Fedora 37+).
+
+Setiap push ke `main` membangun ulang installer lewat GitHub Actions (`.github/workflows/release.yml`).
+
 ## Benchmark
 
 96,6 MB source code (6.893 file, salinan registry cargo), 4 core, rata-rata satu kali jalan.
@@ -116,3 +134,7 @@ cargo test
 - Ekstrak `.rar` (butuh pustaka unrar berlisensi non-bebas).
 - Arsip terpecah (multi-volume) dan menu klik-kanan di Explorer/Finder.
 - Tanda tangan kode untuk installer.
+
+## Lisensi
+
+[MIT](LICENSE)

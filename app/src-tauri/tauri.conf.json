@@ -36,17 +36,30 @@
     ],
     "fileAssociations": [
       {
-        "ext": ["czip"],
+        "ext": [
+          "czip"
+        ],
         "name": "czip archive",
         "description": "czip archive",
         "mimeType": "application/x-czip",
         "role": "Editor"
       },
       {
-        "ext": ["zip", "7z", "tzst", "tgz", "txz"],
+        "ext": [
+          "zip",
+          "7z",
+          "tzst",
+          "tgz",
+          "txz"
+        ],
         "name": "Archive",
         "role": "Viewer"
       }
-    ]
+    ],
+    "publisher": "haloabdur",
+    "copyright": "Copyright (c) 2026 haloabdur",
+    "license": "MIT",
+    "licenseFile": "../../LICENSE",
+    "longDescription": "czip compresses any mix of files and folders into .czip, .zip, .7z or .tar.zst and opens common archive formats."
   }
 }
