@@ -1,0 +1,25 @@
+[package]
+name = "czip-core"
+description = "Compression engine for czip: native .czip format plus zip, 7z and tar.zst"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+zstd = { version = "0.14", features = ["zstdmt"] }
+zip = "9"
+sevenz-rust2 = "0.24"
+lzma-rust2 = "0.24"
+flate2 = { version = "1", default-features = false, features = ["zlib-rs"] }
+tar = "0.4"
+walkdir = "2"
+rayon = "1"
+blake3 = "1"
+chacha20poly1305 = "0.11"
+argon2 = "0.6"
+getrandom = "0.3"
+thiserror = "2"
+filetime = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

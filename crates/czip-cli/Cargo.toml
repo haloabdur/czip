@@ -1,0 +1,17 @@
+[package]
+name = "czip-cli"
+description = "Command-line front-end for czip"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "czip"
+path = "src/main.rs"
+
+[dependencies]
+czip-core = { path = "../czip-core" }
+clap = { version = "4", features = ["derive"] }
+indicatif = "0.18"
+rpassword = "7"
+ctrlc = "3"
